@@ -144,7 +144,7 @@ object  ``X``, which contains several attributes such as, e.g.:
   rates of the Metropolis steps.
 
 Details may vary in a given algorithm; the common idea is that attribute
-``shared`` is the only one which not behave like an array of length N.
+``shared`` is the only one which does not behave like an array of length N.
 The main point of ``ThetaParticles`` is to implement fancy indexing, which is
 convenient for e.g. resampling::
 
