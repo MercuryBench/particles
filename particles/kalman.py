@@ -8,7 +8,7 @@ The Kalman filter/smoother is a well-known algorithm for computing recursively
 the filtering/smoothing distributions of a linear Gaussian model, i.e. a model
 of the form:
 
-.. math:
+.. math::
     X_0 & \sim N(\mu_0,C_0) \\
     X_t & = F X_{t-1} + U_t, \quad   U_t \sim N(0, C_X) \\
     Y_t & = G X_t + V_t,     \quad   V_t \sim N(0, C_Y)
@@ -52,7 +52,7 @@ more conveniently parametrised class `LinearGauss` (which is a sub-class of
 
 which corresponds to model:
 
-.. math:
+.. math::
     X_0                 & \sim N(0, \sigma_0^2) \\
     X_t|X_{t-1}=x_{t-1} & \sim N(\rho * X_{t-1},\sigma_X^2) \\
     Y_t |X_t=x_t        & \sim N(x_t, \sigma_Y^2)
@@ -295,7 +295,7 @@ def smoother_step(F, filt, next_pred, next_smth):
 class MVLinearGauss(ssm.StateSpaceModel):
     r"""Multivariate linear Gaussian model.
 
-    .. math:
+    .. math::
         X_0 & \sim N(\mu_0(theta), cov_0(theta)) \\
         X_t & = F(theta) * X_{t-1} + U_t, \quad   U_t\sim N(0, cov_X(theta)) \\
         Y_t & = G(theta) * X_t + V_t,     \quad   V_t \sim N(0, cov_Y(theta))
@@ -441,7 +441,7 @@ class MVLinearGauss(ssm.StateSpaceModel):
 class MVLinearGauss_Guarniero_etal(MVLinearGauss):
     """Special case of a MV Linear Gaussian ssm from Guarnierio et al. (2016).
 
-    .. math:
+    .. math::
         G = cov_X = cov_Y = cov_0 = I_{d_x}
 
         F_{i, j} = \alpha^ { 1 + |i-j|}
@@ -474,7 +474,7 @@ class MVLinearGauss_Guarniero_etal(MVLinearGauss):
 class LinearGauss(MVLinearGauss):
     r"""A basic (univariate) linear Gaussian model.
 
-        .. math:
+        .. math::
             X_0                 & \sim N(0, \sigma_0^2) \\
             X_t|X_{t-1}=x_{t-1} & \sim N(\rho * X_{t-1},\sigma_X^2) \\
             Y_t |X_t=x_t        & \sim N(x_t, \sigma_Y^2)
@@ -483,7 +483,7 @@ class LinearGauss(MVLinearGauss):
         ----
         If parameter sigma0 is set to None, it is replaced by the quantity that
         makes the state process invariant:
-        :math:`\sigma_X^2 / (1 - \rho^2)`
+        :math::`\sigma_X^2 / (1 - \rho^2)`
     """
     default_params = {"sigmaY": 0.2, "rho": 0.9, "sigmaX": 1.0, "sigma0": None}
 
