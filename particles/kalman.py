@@ -292,15 +292,22 @@ def smoother_step(F, filt, next_pred, next_smth):
 # State-space model classes
 ###############################
 
-
-class MVLinearGauss(ssms.StateSpaceModel):
+class MVLinearGauss(ssm.StateSpaceModel):
     r"""Multivariate linear Gaussian model.
 
     .. math::
-        X_0 & \sim N(\mu_0, cov_0) \\
-        X_t & = F * X_{t-1} + U_t, \quad   U_t\sim N(0, cov_X) \\
-        Y_t & = G * X_t + V_t,     \quad   V_t \sim N(0, cov_Y)
+        X_0 & \sim N(\mu_0(theta), cov_0(theta)) \\
+        X_t & = F(theta) * X_{t-1} + U_t, \quad   U_t\sim N(0, cov_X(theta)) \\
+        Y_t & = G(theta) * X_t + V_t,     \quad   V_t \sim N(0, cov_Y(theta))
 
+    This class includes the case of a "normal" linear system, and additionally 
+    the case where all quantities of this object depend on an external 
+    parameter which is supplied "just in time". Main application for this 
+    is the Rao-Blackwellised Particle Filter, where the dynamics of the "nested"
+    system is linear conditional on a state theta, so a Kalman filter is applied
+    for a different value of this state theta every time.
+    
+    1. If you don't need this additional functionality, just set `theta0 = None`, 
     The only mandatory parameters are `covX` and `covY` (from which the
     dimensions dx and dy of, respectively, X_t, and Y_t, are deduced). The
     default values for the other parameters are:
@@ -310,55 +317,123 @@ class MVLinearGauss(ssms.StateSpaceModel):
     * `F` : Identity matrix of shape (dx, dx)
     * `G` : (dy, dx) matrix such that G[i, j] = 1[i=j]
 
+    2. If you need the flexibility of performing Kalman operations with an 
+    external parameter, set `theta0` to an arbitrary (allowed) value of this 
+    parameter. The use of this is two-fold: This both signals to this class
+    that an external parameter needs to be supplied every time, and in addition,
+    dimensions dx and dy of, respectively, X_t, and Y_t, are deduced by 
+    evaluating the mandatory parameters (functions) `covX` and `covY` 
+    in this typical parameter `theta0`. The
+    default values for the other parameters are:
+      
+    * `mu0` : a function returning an array of zeros (of size dx)
+    * `cov0`: cov_X
+    * `F` : a function returning the Identity matrix of shape (dx, dx)
+    * `G` : a function returning a (dy, dx) matrix such that G[i, j] = 1[i=j]
+
     Note
     ----
     The Kalman filter takes as an input an instance of this class (or one of
     its subclasses).
     """
 
-    def __init__(self, F=None, G=None, covX=None, covY=None, mu0=None, cov0=None):
-        self.covX, self.covY = np.atleast_2d(covX), np.atleast_2d(covY)
-        self.dx, self.dy = self.covX.shape[0], self.covY.shape[0]
-        self.mu0 = np.zeros(self.dx) if mu0 is None else mu0
-        self.cov0 = self.covX if cov0 is None else np.atleast_2d(cov0)
-        self.F = np.eye(self.dx) if F is None else np.atleast_2d(F)
-        self.G = np.eye(self.dy, self.dx) if G is None else np.atleast_2d(G)
-        self.check_shapes()
+    def __init__(self, theta0=None, F=None, G=None, covX=None, covY=None, mu0=None, cov0=None):
+        if theta0 is None: # "normal" linear system class, no external dependence on parameters
+          self.covX, self.covY = np.atleast_2d(covX), np.atleast_2d(covY)
+          self.dx, self.dy = self.covX.shape[0], self.covY.shape[0]
+          self.mu0 = np.zeros(self.dx) if mu0 is None else mu0
+          self.cov0 = self.covX if cov0 is None else np.atleast_2d(cov0)
+          self.F = np.eye(self.dx) if F is None else np.atleast_2d(F)
+          self.G = np.eye(self.dy, self.dx) if G is None else np.atleast_2d(G)
+          self.check_shapes()
+        else: # parametrised linear class
+          self.theta0 = theta0          
+          #self.covX, self.covY = np.atleast_2d(covX), np.atleast_2d(covY) # TODO: Reintroduce this on the level of functions, also in three lines below
+          self.dx, self.dy = self.covX(theta0).shape[0], self.covY(theta0).shape[0]
+          self.mu0 = lambda th: np.zeros(self.dx) if mu0 is None else mu0
+          self.cov0 = lambda th: self.covX if cov0 is None else cov0 #np.atleast_2d(cov0) 
+          self.F = lambda th: np.eye(self.dx) if F is None else F #np.atleast_2d(F)
+          self.G =lambda th: np.eye(self.dy, self.dx) if G is None else G #np.atleast_2d(G)
+          self.check_shapes()
 
     def check_shapes(self):
         """
         Check all dimensions are correct.
         """
-        assert self.covX.shape == (self.dx, self.dx), error_msg
-        assert self.covY.shape == (self.dy, self.dy), error_msg
-        assert self.F.shape == (self.dx, self.dx), error_msg
-        assert self.G.shape == (self.dy, self.dx), error_msg
-        assert self.mu0.shape == (self.dx,), error_msg
-        assert self.cov0.shape == (self.dx, self.dx), error_msg
+        if self.theta0 is None:
+          assert self.covX.shape == (self.dx, self.dx), error_msg
+          assert self.covY.shape == (self.dy, self.dy), error_msg
+          assert self.F.shape == (self.dx, self.dx), error_msg
+          assert self.G.shape == (self.dy, self.dx), error_msg
+          assert self.mu0.shape == (self.dx,), error_msg
+          assert self.cov0.shape == (self.dx, self.dx), error_msg
+        else:
+          assert self.covX(self.theta0).shape == (self.dx, self.dx), error_msg
+          assert self.covY(self.theta0).shape == (self.dy, self.dy), error_msg
+          assert self.F(self.theta0).shape == (self.dx, self.dx), error_msg
+          assert self.G(self.theta0).shape == (self.dy, self.dx), error_msg
+          assert self.mu0(self.theta0).shape == (self.dx,), error_msg
+          assert self.cov0(self.theta0).shape == (self.dx, self.dx), error_msg
 
-    def PX0(self):
-        return dists.MvNormal(loc=self.mu0, cov=self.cov0)
+    def PX0(self, theta=None):
+        if self.theta0 is None:
+          return dists.MvNormal(loc=self.mu0, cov=self.cov0)
+        else:
+          if theta is None:
+            theta = self.theta0
+          return dists.MvNormal(loc=self.mu0(theta), cov=self.cov0(theta))
 
-    def PX(self, t, xp):
-        return dists.MvNormal(loc=np.dot(xp, self.F.T), cov=self.covX)
+    def PX(self, t, xp, theta=None):
+        if self.theta0 is None:
+          return dists.MvNormal(loc=np.dot(xp, self.F.T), cov=self.covX)
+        else:
+          if theta is None:
+            theta = self.theta0
+          return dists.MvNormal(loc=np.dot(xp, self.F(theta).T), cov=self.covX(theta))
 
-    def PY(self, t, xp, x):
-        return dists.MvNormal(loc=np.dot(x, self.G.T), cov=self.covY)
+    def PY(self, t, xp, x, theta=None):
+        if self.theta0 is None:
+          return dists.MvNormal(loc=np.dot(x, self.G.T), cov=self.covY)
+        else:
+          if theta is None:
+            theta = self.theta0
+          return dists.MvNormal(loc=np.dot(x, self.G(theta).T), cov=self.covY(theta))
 
-    def proposal(self, t, xp, data):
-        pred = MeanAndCov(mean=np.matmul(xp, self.F.T), cov=self.covX)
-        f, _ = filter_step_asarray(self.G, self.covY, pred, data[t])
-        return dists.MvNormal(loc=f.mean, cov=f.cov)
+    def proposal(self, t, xp, data, theta=None):
+        if self.theta0 is None:
+          pred = MeanAndCov(mean=np.matmul(xp, self.F.T), cov=self.covX)
+          f, _ = filter_step_asarray(self.G, self.covY, pred, data[t])
+          return dists.MvNormal(loc=f.mean, cov=f.cov)
+        else:
+          if theta is None:
+            theta = self.theta0
+          pred = MeanAndCov(mean=np.matmul(xp, self.F(theta).T), cov=self.covX(theta))
+          f, _ = filter_step_asarray(self.G(theta), self.covY(theta), pred, data[t])
+          return dists.MvNormal(loc=f.mean, cov=f.cov)
 
-    def proposal0(self, data):
-        pred0 = MeanAndCov(mean=self.mu0, cov=self.cov0)
-        f, _ = filter_step(self.G, self.covY, pred0, data[0])
-        return dists.MvNormal(loc=f.mean, cov=f.cov)
+    def proposal0(self, data, theta=None):
+        if self.theta0 is None:
+          pred0 = MeanAndCov(mean=self.mu0, cov=self.cov0)
+          f, _ = filter_step(self.G, self.covY, pred0, data[0])
+          return dists.MvNormal(loc=f.mean, cov=f.cov)
+        else:
+          if theta is None:
+            theta = self.theta0
+          pred0 = MeanAndCov(mean=self.mu0(theta), cov=self.cov0(theta))
+          f, _ = filter_step(self.G(theta), self.covY(theta), pred0, data[0])
+          return dists.MvNormal(loc=f.mean, cov=f.cov)
 
-    def logeta(self, t, x, data):
-        pred = MeanAndCov(mean=np.matmul(x, self.F.T), cov=self.covX)
-        _, logpyt = filter_step_asarray(self.G, self.covY, pred, data[t + 1])
-        return logpyt
+    def logeta(self, t, x, data, theta=None):
+        if self.theta0 is None:
+          pred = MeanAndCov(mean=np.matmul(x, self.F.T), cov=self.covX)
+          _, logpyt = filter_step_asarray(self.G, self.covY, pred, data[t + 1])
+          return logpyt
+        else:
+          if theta is None:
+            theta = self.theta0
+          pred = MeanAndCov(mean=np.matmul(x, self.F(theta).T), cov=self.covX(theta))
+          _, logpyt = filter_step_asarray(self.G(theta), self.covY(theta), pred, data[t + 1])
+          return logpyt
 
 
 class MVLinearGauss_Guarniero_etal(MVLinearGauss):
