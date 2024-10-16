@@ -145,7 +145,7 @@ import numpy as np
 from scipy.linalg import solve
 
 from particles import distributions as dists
-from particles import state_space_models as ssms
+from particles import state_space_models as ssm
 
 error_msg = "arguments of KalmanFilter.__init__ have inconsistent shapes"
 
@@ -486,7 +486,7 @@ class LinearGauss(MVLinearGauss):
     default_params = {"sigmaY": 0.2, "rho": 0.9, "sigmaX": 1.0, "sigma0": None}
 
     def __init__(self, **kwargs):
-        ssms.StateSpaceModel.__init__(self, **kwargs)
+        ssm.StateSpaceModel.__init__(self, **kwargs)
         if self.sigma0 is None:
             self.sigma0 = self.sigmaX / np.sqrt(1.0 - self.rho ** 2)
         # arguments for Kalman
