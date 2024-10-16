@@ -8,7 +8,7 @@ The Kalman filter/smoother is a well-known algorithm for computing recursively
 the filtering/smoothing distributions of a linear Gaussian model, i.e. a model
 of the form:
 
-.. math::
+.. math:
     X_0 & \sim N(\mu_0,C_0) \\
     X_t & = F X_{t-1} + U_t, \quad   U_t \sim N(0, C_X) \\
     Y_t & = G X_t + V_t,     \quad   V_t \sim N(0, C_Y)
@@ -20,7 +20,7 @@ MVLinearGauss class and subclasses
 ==================================
 
 To define a specific linear Gaussian model, we instantiate class
-`MVLinearGauss` (or one its subclass) as follows::
+`MVLinearGauss` (or one its subclass) as follows:
 
     import numpy as np
     from particles import kalman
@@ -33,7 +33,7 @@ specify `mu0`and  `cov0` (the mean and covariance of the initial state X_0).
 (See the documentation of the class for more details.)
 
 Class `MVLinearGauss` is a sub-class of `StateSpaceModel` in module
-`state_space_models`, so it inherits methods from its parent such as::
+`state_space_models`, so it inherits methods from its parent such as:
 
     true_states, data = ssm.simulate(30)
 
@@ -46,13 +46,13 @@ Gaussian.)
 
 To define a univariate linear Gaussian model, you may want to use instead the
 more conveniently parametrised class `LinearGauss` (which is a sub-class of
-``MVLinearGauss``)::
+``MVLinearGauss``):
 
     ssm = LinearGauss(rho=0.3, sigmaX=1., sigmaY=.2, sigma0=1.)
 
 which corresponds to model:
 
-.. math::
+.. math:
     X_0                 & \sim N(0, \sigma_0^2) \\
     X_t|X_{t-1}=x_{t-1} & \sim N(\rho * X_{t-1},\sigma_X^2) \\
     Y_t |X_t=x_t        & \sim N(x_t, \sigma_Y^2)
@@ -68,28 +68,28 @@ Gaussian models often used as a benchmark (after Guarniero et al, 2016).
 The Kalman filter is implemented as a class, `Kalman`, with methods
 `filter` and `smoother`. When instantiating the class, one passes
 as arguments the data, and an object that represents the considered model (i.e.
-an instance of MvLinearGauss, see above)::
+an instance of MvLinearGauss, see above):
 
     kf = kalman.Kalman(ssm=ssm, data=data)
     kf.filter()
 
 The second line implements the forward pass of a Kalman filter. The results are
 stored as lists of `MeanAndCov` objects, that is, named tuples with attributes
-'mean' and 'cov' that represent a Gaussian distribution. For instance::
+'mean' and 'cov' that represent a Gaussian distribution. For instance:
 
     kf.filt[3].mean  # mean of the filtering distribution at time 3
     kf.pred[7].cov  # cov matrix of the predictive distribution at time 7
 
-The forward pass also computes the log-likelihood of the data::
+The forward pass also computes the log-likelihood of the data:
 
     kf.logpyt[5]  # log-density of Y_t | Y_{0:t-1} at time t=5
 
-Smoothing works along the same lines::
+Smoothing works along the same lines:
 
     kf.smoother()
 
 then object kf contains a list called smooth, which represents the successive
-(marginal) smoothing distributions::
+(marginal) smoothing distributions:
 
     kf.smth[8].mean  # mean of the smoothing dist at time 8
 
@@ -101,7 +101,7 @@ Kalman objects as iterators
 ===========================
 
 It is possible to perform the forward pass step by step; in fact a `Kalman`
-object is an iterator::
+object is an iterator:
 
     kf = kalman.Kalman(ssm=ssm, data=data)
     next(kf)  # one step
@@ -120,7 +120,7 @@ The module also defines low-level functions that perform a single step of the
 forward or backward step. Some of these function makes it possible to perform
 such steps *in parallel* (e.g. for N predictive means).  The table below lists
 these functions. Some of the required inputs are `MeanAndCov` objects, which
-may be defined as follows::
+may be defined as follows:
 
     my_predictive_dist = kalman.MeanAndCov(mean=np.ones(2), cov=np.eye(2))
 
@@ -295,7 +295,7 @@ def smoother_step(F, filt, next_pred, next_smth):
 class MVLinearGauss(ssm.StateSpaceModel):
     r"""Multivariate linear Gaussian model.
 
-    .. math::
+    .. math:
         X_0 & \sim N(\mu_0(theta), cov_0(theta)) \\
         X_t & = F(theta) * X_{t-1} + U_t, \quad   U_t\sim N(0, cov_X(theta)) \\
         Y_t & = G(theta) * X_t + V_t,     \quad   V_t \sim N(0, cov_Y(theta))
@@ -348,19 +348,21 @@ class MVLinearGauss(ssm.StateSpaceModel):
           self.check_shapes()
         else: # parametrised linear class
           self.theta0 = theta0          
+          self.covX = covX
+          self.covY = covY
           #self.covX, self.covY = np.atleast_2d(covX), np.atleast_2d(covY) # TODO: Reintroduce this on the level of functions, also in three lines below
           self.dx, self.dy = self.covX(theta0).shape[0], self.covY(theta0).shape[0]
-          self.mu0 = lambda th: np.zeros(self.dx) if mu0 is None else mu0
-          self.cov0 = lambda th: self.covX if cov0 is None else cov0 #np.atleast_2d(cov0) 
-          self.F = lambda th: np.eye(self.dx) if F is None else F #np.atleast_2d(F)
-          self.G =lambda th: np.eye(self.dy, self.dx) if G is None else G #np.atleast_2d(G)
+          self.mu0 = (lambda th: np.zeros(self.dx)) if mu0 is None else mu0
+          self.cov0 = (lambda th: self.covX) if cov0 is None else cov0 #np.atleast_2d(cov0) 
+          self.F = (lambda th: np.eye(self.dx)) if F is None else F #np.atleast_2d(F)
+          self.G = (lambda th: np.eye(self.dy, self.dx)) if G is None else G #np.atleast_2d(G)
           self.check_shapes()
 
     def check_shapes(self):
         """
         Check all dimensions are correct.
         """
-        if self.theta0 is None:
+        if not(hasattr(self, "theta0")):
           assert self.covX.shape == (self.dx, self.dx), error_msg
           assert self.covY.shape == (self.dy, self.dy), error_msg
           assert self.F.shape == (self.dx, self.dx), error_msg
@@ -376,7 +378,7 @@ class MVLinearGauss(ssm.StateSpaceModel):
           assert self.cov0(self.theta0).shape == (self.dx, self.dx), error_msg
 
     def PX0(self, theta=None):
-        if self.theta0 is None:
+        if not(hasattr(self, "theta0")):
           return dists.MvNormal(loc=self.mu0, cov=self.cov0)
         else:
           if theta is None:
@@ -384,7 +386,7 @@ class MVLinearGauss(ssm.StateSpaceModel):
           return dists.MvNormal(loc=self.mu0(theta), cov=self.cov0(theta))
 
     def PX(self, t, xp, theta=None):
-        if self.theta0 is None:
+        if not(hasattr(self, "theta0")):
           return dists.MvNormal(loc=np.dot(xp, self.F.T), cov=self.covX)
         else:
           if theta is None:
@@ -392,7 +394,7 @@ class MVLinearGauss(ssm.StateSpaceModel):
           return dists.MvNormal(loc=np.dot(xp, self.F(theta).T), cov=self.covX(theta))
 
     def PY(self, t, xp, x, theta=None):
-        if self.theta0 is None:
+        if not(hasattr(self, "theta0")):
           return dists.MvNormal(loc=np.dot(x, self.G.T), cov=self.covY)
         else:
           if theta is None:
@@ -400,7 +402,7 @@ class MVLinearGauss(ssm.StateSpaceModel):
           return dists.MvNormal(loc=np.dot(x, self.G(theta).T), cov=self.covY(theta))
 
     def proposal(self, t, xp, data, theta=None):
-        if self.theta0 is None:
+        if not(hasattr(self, "theta0")):
           pred = MeanAndCov(mean=np.matmul(xp, self.F.T), cov=self.covX)
           f, _ = filter_step_asarray(self.G, self.covY, pred, data[t])
           return dists.MvNormal(loc=f.mean, cov=f.cov)
@@ -412,7 +414,7 @@ class MVLinearGauss(ssm.StateSpaceModel):
           return dists.MvNormal(loc=f.mean, cov=f.cov)
 
     def proposal0(self, data, theta=None):
-        if self.theta0 is None:
+        if not(hasattr(self, "theta0")):
           pred0 = MeanAndCov(mean=self.mu0, cov=self.cov0)
           f, _ = filter_step(self.G, self.covY, pred0, data[0])
           return dists.MvNormal(loc=f.mean, cov=f.cov)
@@ -424,7 +426,7 @@ class MVLinearGauss(ssm.StateSpaceModel):
           return dists.MvNormal(loc=f.mean, cov=f.cov)
 
     def logeta(self, t, x, data, theta=None):
-        if self.theta0 is None:
+        if not(hasattr(self, "theta0")):
           pred = MeanAndCov(mean=np.matmul(x, self.F.T), cov=self.covX)
           _, logpyt = filter_step_asarray(self.G, self.covY, pred, data[t + 1])
           return logpyt
@@ -439,7 +441,7 @@ class MVLinearGauss(ssm.StateSpaceModel):
 class MVLinearGauss_Guarniero_etal(MVLinearGauss):
     """Special case of a MV Linear Gaussian ssm from Guarnierio et al. (2016).
 
-    .. math::
+    .. math:
         G = cov_X = cov_Y = cov_0 = I_{d_x}
 
         F_{i, j} = \alpha^ { 1 + |i-j|}
@@ -472,7 +474,7 @@ class MVLinearGauss_Guarniero_etal(MVLinearGauss):
 class LinearGauss(MVLinearGauss):
     r"""A basic (univariate) linear Gaussian model.
 
-        .. math::
+        .. math:
             X_0                 & \sim N(0, \sigma_0^2) \\
             X_t|X_{t-1}=x_{t-1} & \sim N(\rho * X_{t-1},\sigma_X^2) \\
             Y_t |X_t=x_t        & \sim N(x_t, \sigma_Y^2)
@@ -538,7 +540,7 @@ class Kalman:
     See the documentation of the module for more details.
     """
 
-    def __init__(self, ssm=None, data=None):
+    def __init__(self, ssm=None, data=None, thetas=None):
         """
         Parameters
         ----------
@@ -546,9 +548,15 @@ class Kalman:
             the linear Gaussian model of interest
         data: list-like
             the data
+        thetas: list-like
+          optional external arguments which modify the components of 
+          the linear system. If this is supplied, has to be at least as long as
+          the data, since it will be iterated through along the data
         """
         self.ssm = ssm
         self.data = data
+        if thetas is not None:
+          self.thetas = iter(thetas)
         self.pred, self.filt, self.logpyt = [], [], []
 
     @property
@@ -560,11 +568,27 @@ class Kalman:
             yt = self.data[self.t]
         except IndexError:
             raise StopIteration
-        if not self.pred:
-            self.pred += [MeanAndCov(mean=self.ssm.mu0, cov=self.ssm.cov0)]
+        if not(hasattr(self, "thetas")): # apparently, this is an unparametrised linear system. TODO: Check this assumption
+          mu0 = self.ssm.mu0
+          cov0 = self.ssm.cov0
+          F = self.ssm.F
+          covX = self.ssm.covX
+          G = self.ssm.G
+          covY = self.ssm.covY
         else:
-            self.pred += [predict_step(self.ssm.F, self.ssm.covX, self.filt[-1])]
-        new_filt, new_logpyt = filter_step(self.ssm.G, self.ssm.covY, self.pred[-1], yt)
+          theta = next(self.thetas)
+          mu0 = self.ssm.mu0(theta)
+          cov0 = self.ssm.cov0(theta)
+          F = self.ssm.F(theta)
+          covX = self.ssm.covX(theta)
+          G = self.ssm.G(theta)
+          covY = self.ssm.covY(theta)
+        
+        if not self.pred:
+            self.pred += [MeanAndCov(mean=mu0, cov=cov0)]
+        else:
+            self.pred += [predict_step(F, covX, self.filt[-1])]
+        new_filt, new_logpyt = filter_step(G, covY, self.pred[-1], yt)
         self.filt.append(new_filt)
         self.logpyt.append(new_logpyt)
 
