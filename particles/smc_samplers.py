@@ -500,6 +500,11 @@ class ThetaParticles:
             v[n] = getattr(src, k)[m]
 
 
+class ThetaParticles_RaoBlackwell(ThetaParticles):
+    """Base class for all state variables
+    """
+
+
 #############################
 # Basic importance sampler
 

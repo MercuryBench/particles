@@ -95,6 +95,8 @@ See the documentation of `SMC` for more details.
 
 
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 from particles import collectors, hilbert
 from particles import resampling as rs
@@ -104,6 +106,39 @@ err_msg_missing_trans = """
     Feynman-Kac class %s is missing method logpt, which provides the log-pdf
     of Markov transition X_t | X_{t-1}. This is required by most smoothing
     algorithms."""
+    
+def plot_thetaPart(tp, wgts, k=None, N_smp=50):
+    angles = tp.theta['phi']
+    ms = [MC.mean for MC in tp.MC]
+    Cs = [MC.cov for MC in tp.MC]
+    
+    plt.figure(figsize=(3,6))
+    plt.subplot(311)
+    plt.hist(angles,20,weights=wgts.W)
+    if k is not None:
+        plt.axvline(angles[k], color='k')
+    # plt.xlim([-0.5,2*pi+0.5])
+    plt.title("phi")
+    
+    indices = rs.stratified(wgts.W)
+    
+    samples = np.vstack([np.random.multivariate_normal(ms[0].flatten(), Cs[0], N_smp) for k in indices])
+    
+    plt.subplot(312)
+    # plt.plot(samples[:,0], samples[:, 1], '.', alpha=0.01)
+    plt.hist2d(samples[:,0], samples[:, 1], 20)
+    if k is not None:
+        plt.plot(x_true[k][0,0], x_true[k][0,1], 'kx')
+        plt.plot(data[k][0,0], data[k][0,1], 'rx')
+    plt.title("x,y")
+    
+    plt.subplot(3,1,3)
+    plt.hist(samples[:,2], 20)
+    if k is not None:
+        plt.axvline(myABM.v, color='k')
+    plt.title("v")
+    plt.xlim([0,30])
+    plt.tight_layout()
 
 class FeynmanKac:
     """Abstract base class for Feynman-Kac models.
@@ -379,6 +414,7 @@ class SMC:
             else:
                 self.resample_move()
         self.reweight_particles()
+        # plot_thetaPart(self.X, self.wgts)
         self.compute_summaries()
         self.t += 1
 
