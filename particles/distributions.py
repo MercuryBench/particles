@@ -928,7 +928,7 @@ class MvNormal(ProbDist):
     matrix for each particle, see `VaryingCovNormal`.
     """
 
-    def __init__(self, loc=0.0, scale=1.0, cov=None):
+    def __init__(self, loc=np.array([0.0]), scale=1.0, cov=None):
         self.loc = loc
         self.scale = scale
         self.cov = np.eye(loc.shape[-1]) if cov is None else cov
