@@ -166,17 +166,18 @@ def dotdotinv(a, b, c):
 MeanAndCov = collections.namedtuple("MeanAndCov", "mean cov")
 
 
-def predict_step(F, covX, filt):
+def predict_step(F, covX, filt, a=None):
     """Predictive step of Kalman filter.
 
     Parameters
     ----------
     F:  (dx, dx) numpy array
-        Mean of X_t | X_{t-1} is F * X_{t-1}
+        Mean of X_t | X_{t-1} is F * X_{t-1} + a
     covX: (dx, dx) numpy array
         covariance of X_t | X_{t-1}
     filt: MeanAndCov object
         filtering distribution at time t-1
+    a: additive constant
 
     Returns
     -------
@@ -188,12 +189,13 @@ def predict_step(F, covX, filt):
     filt.mean may either be of shape (dx,) or (N, dx); in the latter case
     N predictive steps are performed in parallel.
     """
-    pred_mean = np.matmul(filt.mean, F.T)
+    a = 0 if a is None else a
+    pred_mean = np.matmul(filt.mean, F.T) + a
     pred_cov = dotdot(F, filt.cov, F.T) + covX
     return MeanAndCov(mean=pred_mean, cov=pred_cov)
 
 
-def filter_step(G, covY, pred, yt):
+def filter_step(G, covY, pred, yt, h=None):
     """Filtering step of Kalman filter.
 
     Parameters
@@ -204,6 +206,7 @@ def filter_step(G, covY, pred, yt):
         covariance of Y_t | X_t
     pred: MeanAndCov object
         predictive distribution at time t
+    h: additive constant
 
     Returns
     -------
@@ -212,8 +215,9 @@ def filter_step(G, covY, pred, yt):
     logpyt: float
         log density of Y_t | Y_{0:t-1}
     """
+    h = 0 if h is None else h
     # data prediction
-    data_pred_mean = np.matmul(pred.mean, G.T)
+    data_pred_mean = np.matmul(pred.mean, G.T) + h
     data_pred_cov = dotdot(G, pred.cov, G.T) + covY
     if covY.shape[0] == 1:
         logpyt = dists.Normal(loc=data_pred_mean, scale=np.sqrt(data_pred_cov)).logpdf(
@@ -229,7 +233,7 @@ def filter_step(G, covY, pred, yt):
     return MeanAndCov(mean=filt_mean, cov=filt_cov), logpyt
 
 
-def filter_step_asarray(G, covY, pred, yt):
+def filter_step_asarray(G, covY, pred, yt, h=None):
     """Filtering step of Kalman filter: array version.
 
     Parameters
@@ -240,6 +244,7 @@ def filter_step_asarray(G, covY, pred, yt):
         covariance of Y_t | X_t
     pred: MeanAndCov object
         predictive distribution at time t
+    h: additive constant
 
     Returns
     -------
@@ -255,27 +260,30 @@ def filter_step_asarray(G, covY, pred, yt):
     will have the same shape.
 
     """
+    h = 0 if h is None else h
     pm = pred.mean[:, np.newaxis] if pred.mean.ndim == 1 else pred.mean
     new_pred = MeanAndCov(mean=pm, cov=pred.cov)
-    filt, logpyt = filter_step(G, covY, new_pred, yt)
+    filt, logpyt = filter_step(G, covY, new_pred, yt, h)
     if pred.mean.ndim == 1:
         filt.mean.squeeze()
     return filt, logpyt
 
 
 def smoother_step(F, filt, next_pred, next_smth):
-    """Smoothing step of Kalman filter/smoother.
+    """Smoothing step of Kalman filter/smoother. 
 
     Parameters
     ----------
     F:  (dx, dx) numpy array
-        Mean of X_t | X_{t-1} is F * X_{t-1}
+        Mean of X_t | X_{t-1} is F * X_{t-1} + a
     filt: MeanAndCov object
         filtering distribution at time t
     next_pred: MeanAndCov object
         predictive distribution at time t+1
     next_smth: MeanAndCov object
         smoothing distribution at time t+1
+    a: (dx,) numpy array
+        additive constant
 
     Returns
     -------
@@ -284,7 +292,7 @@ def smoother_step(F, filt, next_pred, next_smth):
     """
     J = dotdotinv(filt.cov, F.T, next_pred.cov)
     smth_cov = filt.cov + dotdot(J, next_smth.cov - next_pred.cov, J.T)
-    smth_mean = filt.mean + np.matmul(next_smth.mean - next_pred.mean, J.T)
+    smth_mean = filt.mean + np.matmul(next_smth.mean - next_pred.mean - a, J.T)
     return MeanAndCov(mean=smth_mean, cov=smth_cov)
 
 
