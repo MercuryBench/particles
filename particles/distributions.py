@@ -928,7 +928,7 @@ class MvNormal(ProbDist):
     matrix for each particle, see `VaryingCovNormal`.
     """
 
-    def __init__(self, loc=0.0, scale=1.0, cov=None):
+    def __init__(self, loc=np.array([0.0]), scale=1.0, cov=None):
         self.loc = loc
         self.scale = scale
         self.cov = np.eye(loc.shape[-1]) if cov is None else cov
@@ -1074,6 +1074,8 @@ class IndepProd(ProbDist):
     ----------
     dists: list of `ProbDist` objects
         The probability distributions of each component
+    variant: flags whether to use a notational variant that assumes that this 
+        distribution is used "in parallel"
 
     Example
     -------
@@ -1090,20 +1092,29 @@ class IndepProd(ProbDist):
 
     """
 
-    def __init__(self, *dists):
+    def __init__(self, *dists, variant=False):
         self.dists = dists
         self.dim = len(dists)
         if all(d.dtype == DiscreteDist.dtype for d in dists):
             self.dtype = DiscreteDist.dtype
         else:
             self.dtype = ProbDist.dtype
+        self.variant = variant
 
-    def logpdf(self, x):
-        return sum([d.logpdf(x[..., i]) for i, d in enumerate(self.dists)])
+    def logpdf(self, x, flag_single_value=False):
+        # if x is not a list of d different points, but a single 
+        # (possible vector-valued) point, set this to True
+        if flag_single_value:
+            sum([d.logpdf(x) for i, d in enumerate(self.dists)])
+        else:
+            return sum([d.logpdf(x[..., i]) for i, d in enumerate(self.dists)])
         # ellipsis: in case x is of shape (d) instead of (N, d)
 
     def rvs(self, size=None):
-        return np.stack([d.rvs(size=size) for d in self.dists], axis=1)
+        if self.variant:
+            return np.concatenate([d.rvs() for d in self.dists])
+        else:
+            return np.stack([d.rvs(size=size) for d in self.dists], axis=1)
 
     def ppf(self, u):
         return np.stack([d.ppf(u[..., i]) for i, d in enumerate(self.dists)], axis=1)
@@ -1182,10 +1193,13 @@ class StructDist(ProbDist):
     laws: dict or ordered dict (as explained above)
         keys are parameter names, values are `ProbDist` objects
     
+    force_sequentially: flags whether samples (via rvs()) can be constructed 
+        one-off (False) or via a loop (True). Typically, MvNormal components
+        have issues with one-off construction.
 
     """
 
-    def __init__(self, laws):
+    def __init__(self, laws, force_sequentially=False):
         if isinstance(laws, OrderedDict):
             self.laws = laws
         elif isinstance(laws, dict):
@@ -1194,6 +1208,7 @@ class StructDist(ProbDist):
             raise TypeError(
                 "recdist class requires a dict or an ordered dict to be instantiated"
             )
+        self.force_sequentially = force_sequentially
         self.dtype = []
         for key, law in self.laws.items():
             if law.dim == 1:
@@ -1211,7 +1226,13 @@ class StructDist(ProbDist):
 
     def rvs(self, size=1):  # Default for size is 1, not None
         out = np.empty(size, dtype=self.dtype)
-        for par, law in self.laws.items():
-            cond_law = law(out) if callable(law) else law
-            out[par] = cond_law.rvs(size=size)
+        if self.force_sequentially:
+            for i_sample in range(size):
+                for par, law in self.laws.items():
+                    cond_law = law(out[i_sample]) if callable(law) else law
+                    out[i_sample][par] = cond_law.rvs(size=1)
+        else:
+            for par, law in self.laws.items():
+                cond_law = law(out) if callable(law) else law
+                out[par] = cond_law.rvs(size=size)
         return out
